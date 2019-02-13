@@ -24,6 +24,8 @@ class FlutterWebviewPlugin {
   final _channel = const MethodChannel(_kChannel);
 
   final _onDestroy = StreamController<Null>.broadcast();
+  final _shouldOverrideUrlLoading = StreamController<String>.broadcast();
+  final _onReceivedTitle = StreamController<String>.broadcast();
   final _onUrlChanged = StreamController<String>.broadcast();
   final _onStateChanged = StreamController<WebViewStateChanged>.broadcast();
   final _onScrollXChanged = StreamController<double>.broadcast();
@@ -32,6 +34,12 @@ class FlutterWebviewPlugin {
 
   Future<Null> _handleMessages(MethodCall call) async {
     switch (call.method) {
+      case 'onReceivedTitle':
+        _onReceivedTitle.add(call.arguments['title']);
+       break;
+      case "shouldOverrideUrlLoading":
+        _shouldOverrideUrlLoading.add(call.arguments['url']);
+        break;
       case 'onDestroy':
         _onDestroy.add(null);
         break;
@@ -52,7 +60,8 @@ class FlutterWebviewPlugin {
         );
         break;
       case 'onHttpError':
-        _onHttpError.add(WebViewHttpError(call.arguments['code'], call.arguments['url']));
+        _onHttpError.add(
+            WebViewHttpError(call.arguments['code'], call.arguments['url']));
         break;
     }
   }
@@ -62,6 +71,10 @@ class FlutterWebviewPlugin {
 
   /// Listening url changed
   Stream<String> get onUrlChanged => _onUrlChanged.stream;
+  Stream<String> get onReceivedTitle => _onReceivedTitle.stream;
+
+  /// Listening shouldOverrideUrlLoading
+  Stream<String> get shouldOverrideUrlLoading => _shouldOverrideUrlLoading.stream;
 
   /// Listening the onState Event for iOS WebView and Android
   /// content is Map for type: {shouldStart(iOS)|startLoad|finishLoad}
@@ -94,23 +107,23 @@ class FlutterWebviewPlugin {
   /// - [withLocalUrl]: allow url as a local path
   ///     Allow local files on iOs > 9.0
   /// - [scrollBar]: enable or disable scrollbar
-  Future<Null> launch(String url, {
-    Map<String, String> headers,
-    bool withJavascript,
-    bool clearCache,
-    bool clearCookies,
-    bool hidden,
-    bool enableAppScheme,
-    Rect rect,
-    String userAgent,
-    bool withZoom,
-    bool withLocalStorage,
-    bool withLocalUrl,
-    bool scrollBar,
-    bool supportMultipleWindows,
-    bool appCacheEnabled,
-    bool allowFileURLs,
-  }) async {
+  Future<Null> launch(String url,
+      {Map<String, String> headers,
+      bool withJavascript,
+      bool clearCache,
+      bool clearCookies,
+      bool hidden,
+      bool enableAppScheme,
+      Rect rect,
+      String userAgent,
+      bool withZoom,
+      bool withLocalStorage,
+      bool withLocalUrl,
+      bool scrollBar,
+      bool supportMultipleWindows,
+      bool appCacheEnabled,
+      bool allowFileURLs,
+      bool useShouldOverrideUrlLoading}) async {
     final args = <String, dynamic>{
       'url': url,
       'withJavascript': withJavascript ?? true,
@@ -126,6 +139,7 @@ class FlutterWebviewPlugin {
       'supportMultipleWindows': supportMultipleWindows ?? false,
       'appCacheEnabled': appCacheEnabled ?? false,
       'allowFileURLs': allowFileURLs ?? false,
+      'useShouldOverrideUrlLoading': useShouldOverrideUrlLoading ?? false,
     };
 
     if (headers != null) {
@@ -156,6 +170,16 @@ class FlutterWebviewPlugin {
   /// Reloads the WebView.
   Future<Null> reload() async => await _channel.invokeMethod('reload');
 
+  Future<bool> canGoBack() async {
+    final bool canGoBack = await _channel.invokeMethod("canGoBack");
+    return canGoBack;
+  }
+
+  Future<bool> canGoForward() async {
+    final bool canGoForward = await _channel.invokeMethod("canGoForward");
+    return canGoForward;
+  }
+
   /// Navigates back on the Webview.
   Future<Null> goBack() async => await _channel.invokeMethod('back');
 
@@ -175,10 +199,12 @@ class FlutterWebviewPlugin {
   }
 
   // Clean cookies on WebView
-  Future<Null> cleanCookies() async => await _channel.invokeMethod('cleanCookies');
+  Future<Null> cleanCookies() async =>
+      await _channel.invokeMethod('cleanCookies');
 
   // Stops current loading process
-  Future<Null> stopLoading() async => await _channel.invokeMethod('stopLoading');
+  Future<Null> stopLoading() async =>
+      await _channel.invokeMethod('stopLoading');
 
   /// Close all Streams
   void dispose() {

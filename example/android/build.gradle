@@ -2,9 +2,6 @@ buildscript {
     repositories {
         google()
         jcenter()
-        maven {
-            url 'https://maven.google.com/'
-        }
     }
 
     dependencies {
@@ -16,22 +13,17 @@ allprojects {
     repositories {
         google()
         jcenter()
-        maven {
-            url 'https://maven.google.com/'
-        }
     }
 }
 
 rootProject.buildDir = '../build'
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
     project.evaluationDependsOn(':app')
 }
 
 task clean(type: Delete) {
     delete rootProject.buildDir
-}
-
-task wrapper(type: Wrapper) {
-    gradleVersion = '2.14.1'
 }

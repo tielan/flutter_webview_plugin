@@ -7,30 +7,30 @@ import 'package:flutter/rendering.dart';
 import 'base.dart';
 
 class WebviewScaffold extends StatefulWidget {
-
-  const WebviewScaffold({
-    Key key,
-    this.appBar,
-    @required this.url,
-    this.headers,
-    this.withJavascript,
-    this.clearCache,
-    this.clearCookies,
-    this.enableAppScheme,
-    this.userAgent,
-    this.primary = true,
-    this.persistentFooterButtons,
-    this.bottomNavigationBar,
-    this.withZoom,
-    this.withLocalStorage,
-    this.withLocalUrl,
-    this.scrollBar,
-    this.supportMultipleWindows,
-    this.appCacheEnabled,
-    this.hidden = false,
-    this.initialChild,
-    this.allowFileURLs,
-  }) : super(key: key);
+  const WebviewScaffold(
+      {Key key,
+      this.appBar,
+      @required this.url,
+      this.headers,
+      this.withJavascript,
+      this.clearCache,
+      this.clearCookies,
+      this.enableAppScheme,
+      this.userAgent,
+      this.primary = true,
+      this.persistentFooterButtons,
+      this.bottomNavigationBar,
+      this.withZoom,
+      this.withLocalStorage,
+      this.withLocalUrl,
+      this.scrollBar,
+      this.supportMultipleWindows,
+      this.appCacheEnabled,
+      this.hidden = false,
+      this.initialChild,
+      this.allowFileURLs,
+      this.useShouldOverrideUrlLoading = true})
+      : super(key: key);
 
   final PreferredSizeWidget appBar;
   final String url;
@@ -52,6 +52,7 @@ class WebviewScaffold extends StatefulWidget {
   final bool hidden;
   final Widget initialChild;
   final bool allowFileURLs;
+  final bool useShouldOverrideUrlLoading;
 
   @override
   _WebviewScaffoldState createState() => _WebviewScaffoldState();
@@ -62,19 +63,29 @@ class _WebviewScaffoldState extends State<WebviewScaffold> {
   Rect _rect;
   Timer _resizeTimer;
   StreamSubscription<WebViewStateChanged> _onStateChanged;
+  String title = '';
 
   @override
   void initState() {
     super.initState();
     webviewReference.close();
 
-    if (widget.hidden) {
-      _onStateChanged = webviewReference.onStateChanged.listen((WebViewStateChanged state) {
-        if (state.type == WebViewState.finishLoad) {
-          webviewReference.show();
-        }
+    _onStateChanged =
+        webviewReference.onStateChanged.listen((WebViewStateChanged state) {
+      if (state.type == WebViewState.startLoad) {
+        webviewReference.show();
+      }
+    });
+    //接收title 变化
+    webviewReference.onReceivedTitle.listen((String title) {
+      setState(() {
+        this.title = title;
       });
-    }
+    });
+    webviewReference.shouldOverrideUrlLoading.listen((String url) {
+      print(url);
+       webviewReference.reloadUrl(url);
+    });
   }
 
   @override
@@ -88,46 +99,64 @@ class _WebviewScaffoldState extends State<WebviewScaffold> {
     webviewReference.dispose();
   }
 
+  Widget buildAppBar() {
+    return AppBar(
+      title: Text(title),
+      centerTitle: true,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: widget.appBar,
+      appBar: widget.appBar ?? buildAppBar(),
       persistentFooterButtons: widget.persistentFooterButtons,
       bottomNavigationBar: widget.bottomNavigationBar,
-      body: _WebviewPlaceholder(
-        onRectChanged: (Rect value) {
-          if (_rect == null) {
-            _rect = value;
-            webviewReference.launch(
-              widget.url,
-              headers: widget.headers,
-              withJavascript: widget.withJavascript,
-              clearCache: widget.clearCache,
-              clearCookies: widget.clearCookies,
-              hidden: widget.hidden,
-              enableAppScheme: widget.enableAppScheme,
-              userAgent: widget.userAgent,
-              rect: _rect,
-              withZoom: widget.withZoom,
-              withLocalStorage: widget.withLocalStorage,
-              withLocalUrl: widget.withLocalUrl,
-              scrollBar: widget.scrollBar,
-              supportMultipleWindows: widget.supportMultipleWindows,
-              appCacheEnabled: widget.appCacheEnabled,
-              allowFileURLs: widget.allowFileURLs,
-            );
+      body: WillPopScope(
+        onWillPop: () async {
+          if (await webviewReference.canGoBack()) {
+            webviewReference.goBack();
+            return new Future.value(false);
           } else {
-            if (_rect != value) {
-              _rect = value;
-              _resizeTimer?.cancel();
-              _resizeTimer = Timer(const Duration(milliseconds: 250), () {
-                // avoid resizing to fast when build is called multiple time
-                webviewReference.resize(_rect);
-              });
-            }
+            return new Future.value(true);
           }
         },
-        child: widget.initialChild ?? const Center(child: const CircularProgressIndicator()),
+        child: _WebviewPlaceholder(
+          onRectChanged: (Rect value) {
+            if (_rect == null) {
+              _rect = value;
+              webviewReference.launch(widget.url,
+                  headers: widget.headers,
+                  withJavascript: widget.withJavascript,
+                  clearCache: widget.clearCache,
+                  clearCookies: widget.clearCookies,
+                  hidden: widget.hidden,
+                  enableAppScheme: widget.enableAppScheme,
+                  userAgent: widget.userAgent,
+                  rect: _rect,
+                  withZoom: widget.withZoom,
+                  withLocalStorage: widget.withLocalStorage,
+                  withLocalUrl: widget.withLocalUrl,
+                  scrollBar: widget.scrollBar,
+                  supportMultipleWindows: widget.supportMultipleWindows,
+                  appCacheEnabled: widget.appCacheEnabled,
+                  allowFileURLs: widget.allowFileURLs,
+                  useShouldOverrideUrlLoading:
+                      widget.useShouldOverrideUrlLoading);
+            } else {
+              if (_rect != value) {
+                _rect = value;
+                _resizeTimer?.cancel();
+                _resizeTimer = Timer(const Duration(milliseconds: 250), () {
+                  // avoid resizing to fast when build is called multiple time
+                  webviewReference.resize(_rect);
+                });
+              }
+            }
+          },
+          child: widget.initialChild ??
+              const Center(child: const CircularProgressIndicator()),
+        ),
       ),
     );
   }
@@ -150,7 +179,8 @@ class _WebviewPlaceholder extends SingleChildRenderObjectWidget {
   }
 
   @override
-  void updateRenderObject(BuildContext context, _WebviewPlaceholderRender renderObject) {
+  void updateRenderObject(
+      BuildContext context, _WebviewPlaceholderRender renderObject) {
     renderObject..onRectChanged = onRectChanged;
   }
 }

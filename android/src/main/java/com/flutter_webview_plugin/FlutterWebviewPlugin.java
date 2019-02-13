@@ -77,6 +77,11 @@ public class FlutterWebviewPlugin implements MethodCallHandler, PluginRegistry.A
             case "cleanCookies":
                 cleanCookies(call, result);
                 break;
+            case "canGoBack":
+                canGoBack(call, result);
+                break;
+            case "canGoForward":
+                canGoForward(call, result);
             default:
                 result.notImplemented();
                 break;
@@ -97,7 +102,7 @@ public class FlutterWebviewPlugin implements MethodCallHandler, PluginRegistry.A
         Map<String, String> headers = call.argument("headers");
         boolean scrollBar = call.argument("scrollBar");
         boolean allowFileURLs = call.argument("allowFileURLs");
-
+        boolean useShouldOverrideUrlLoading =   call.argument("useShouldOverrideUrlLoading");
         if (webViewManager == null || webViewManager.closed == true) {
             webViewManager = new WebviewManager(activity);
         }
@@ -118,7 +123,8 @@ public class FlutterWebviewPlugin implements MethodCallHandler, PluginRegistry.A
                 scrollBar,
                 supportMultipleWindows,
                 appCacheEnabled,
-                allowFileURLs
+                allowFileURLs,
+                useShouldOverrideUrlLoading
         );
         result.success(null);
     }
@@ -156,12 +162,24 @@ public class FlutterWebviewPlugin implements MethodCallHandler, PluginRegistry.A
         }
     }
 
+
+    private void canGoBack(MethodCall methodCall, MethodChannel.Result result) {
+        result.success(webViewManager.canGoBack());
+    }
+
+    private void canGoForward(MethodCall methodCall, MethodChannel.Result result) {
+        result.success(webViewManager.canGoForward());
+    }
+
     /**
      * Navigates back on the Webview.
      */
     private void back(MethodCall call, MethodChannel.Result result) {
         if (webViewManager != null) {
-            webViewManager.back(call, result);
+            if (webViewManager.canGoBack()) {
+                webViewManager.back(call, result);
+            }
+            result.success(null);
         }
     }
 
